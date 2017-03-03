@@ -1,0 +1,138 @@
+---
+title: "Reproducible Research Project 1"
+author: "Benjamin Milks"
+
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  Reading the Data
+
+```{r}
+unzip("rrproj1data.zip")
+df <- read.csv("activity.csv")
+```
+
+## Manipulating the Data
+
+```{r}
+datelist <- levels(factor(df$date))
+rdatelist <- lapply(datelist, strptime, format = "%Y-%m-%d")
+rdlist <- vector()
+for (i in 1:length(rdatelist)){
+        ww <- rdatelist[[i]]
+        rdlistlist <- append(rdlist, ww)
+}
+datesums <- vector()
+for (i in datelist) { 
+    qq <- sum(df$steps[df$date == i], na.rm = TRUE)
+    datesums <- append(datesums, qq)}
+```
+
+## Histogram of Step Frequency 
+ 
+```{r}
+hist(datesums, breaks = 10, main = "Histogram of Step Frequency", xlab = "Steps")
+```
+
+## Median and Mean Steps in a Day
+
+For my calculation here I remove the days where there were only NA's. The days that only had NA's were recorded as NA in my making of datesums.
+```{r}
+meanspd <- mean(datesums, na.rm = TRUE)
+print(meanspd)
+medianspd <- median(datesums, na.rm = TRUE)
+print(medianspd)
+```
+
+## Looking at Number of Steps By Time of Day
+
+```{r}
+intervalmeans <- vector()
+intervallist <- levels(factor(df$interval))
+for (i in intervallist) { 
+    pp <- mean(df$steps[df$interval == i], na.rm = TRUE)
+    intervalmeans <- append(intervalmeans, pp)}
+
+plot(intervallist, intervalmeans, type = "l", xlab = "Time Interval", ylab = "Mean Steps")
+highstepinterval <- which.max(intervalmeans)
+highstepinterval <- highstepinterval*5 ## Each spot on the list represents five minutes, so if we multiply the number we got by five, we know the number of minutes after midnight.
+highstepinterval
+## We may want to know what time this is.
+hours <- highstepinterval/60
+hours
+## 8.666667 means 8 and 2/3 hours, or 8:40am.
+
+## We know which interval has the highest mean, now we want to know what the maximum value is for mean steps during the 5 minutes.
+max(intervalmeans)
+
+```
+
+
+
+# Strategy for Replacing Missing Data
+
+
+## How Many Times is the Number of Steps Recorded as "na"?
+
+```{r}
+totalnas <- sum(is.na(df$steps))
+print(totalnas)
+```
+
+## What to do to Replace the Missing Data
+
+I think a good replacement would be to replace each na with the mean from the interval. I have a list of interval means from before. So to index the list I have to take the interval, say 25, and divide it by five then add one to get the correct spot from my list of interval means that was calculated earlier.
+```{r}
+dfnona <- df
+m <- c(1:288)
+mm <- 5*m
+newiv <- rep(mm, 61)
+dfnona<- cbind(dfnona, newiv)
+head(dfnona)
+for (i in 1:nrow(dfnona)){
+        im <- dfnona[i,4]
+        iint <- im/5
+        imeanmarker <- iint 
+        dfnona[i,1][is.na(dfnona[i,1])] <- intervalmeans[imeanmarker]
+        
+}
+datelist <- levels(factor(dfnona$date))
+rdatelist <- lapply(datelist, strptime, format = "%Y-%m-%d")
+rdlist <- vector()
+for (i in 1:length(rdatelist)){
+        ww <- rdatelist[[i]]
+        rdlistlist <- append(rdlist, ww)
+}
+datesums <- vector()
+for (i in datelist) { 
+    qq <- sum(dfnona$steps[dfnona$date == i], na.rm = TRUE)
+    datesums <- append(datesums, qq)}
+print(datesums)
+
+hist(datesums, breaks = 10, main = "Histogram of Step Frequency After Impution", xlab = "Steps")
+
+```
+
+
+## Comparing weekends to weekdays to see if steps per day changes
+
+```{r, echo=FALSE}
+library(timeDate)
+```
+
+
+```{r}
+weekenddf <- df
+for (i in 1:nrow(weekenddf)){
+        weekenddf[i,3]<- isWeekday(weekenddf[i,2])
+        
+        
+}
+weekenddf<- cbind(weekenddf, newiv)
+library(lattice)
+xyplot(steps~newiv | factor(interval), data = weekenddf, main = "Steps Per Interval Throughout the Day, Comparing Weekend(0) to Weekdays (1)", xlab = "Time Interval", ylab = "Number of Steps", alpha = 1/4 )
+```
